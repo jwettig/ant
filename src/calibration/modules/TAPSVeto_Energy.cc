@@ -5,6 +5,8 @@
 
 #include "tree/TDataRecord.h"
 
+#include "expconfig/detectors/TAPSVeto.h"
+
 #include <list>
 
 
@@ -14,7 +16,8 @@ using namespace ant::calibration;
 using namespace ant::analysis;
 using namespace ant::analysis::data;
 
-TAPSVeto_Energy::TAPSVeto_Energy(std::shared_ptr<DataManager> calmgr,
+TAPSVeto_Energy::TAPSVeto_Energy(std::shared_ptr<expconfig::detector::TAPSVeto> tapsveto,
+                                 std::shared_ptr<DataManager> calmgr,
                                  Calibration::Converter::ptr_t converter,
                                  double defaultPedestal,
                                  double defaultGain,
@@ -26,44 +29,70 @@ TAPSVeto_Energy::TAPSVeto_Energy(std::shared_ptr<DataManager> calmgr,
            defaultPedestal,
            defaultGain,
            defaultThreshold,
-           defaultRelativeGain)
+           defaultRelativeGain),
+    tapsveto_detector(tapsveto)
 {
 
 }
 
-TAPSVeto_Energy::ThePhysics::ThePhysics(const string& name):
+TAPSVeto_Energy::ThePhysics::ThePhysics(const string& name, unsigned nChannels):
     Physics(name)
 {
-    const BinSettings cb_channels(720);
-    const BinSettings energybins(1000);
+    const BinSettings tapsveto_channels(nChannels);
 
-    ggIM = HistFac.makeTH2D("2 neutral IM (CB,CB)", "IM [MeV]", "#", energybins, cb_channels, "ggIM");
-}
+    h_pedestals = HistFac.makeTH2D(
+                      "TAPSVeto Pedestals",
+                      "Raw ADC value",
+                      "#",
+                      BinSettings(300),
+                      tapsveto_channels,
+                      "Pedestals");
+    h_bananas =
+            HistFac.makeTH3D(
+                "TAPSVeto Bananas",
+                "TAPS LG Energy / MeV",
+                "TAPSVeto Energy / MeV",
+                "Channel",
+                BinSettings(400,0,800),
+                BinSettings(100,0,30),
+                tapsveto_channels,
+                "Bananas"
+                );}
 
 void TAPSVeto_Energy::ThePhysics::ProcessEvent(const Event& event)
 {
     const auto& cands = event.Reconstructed().Candidates();
 
-    for( auto comb = analysis::utils::makeCombination(cands,2); !comb.Done(); ++comb ) {
-        const CandidatePtr& p1 = comb.at(0);
-        const CandidatePtr& p2 = comb.at(1);
-
-        if(p1->VetoEnergy()==0 && p2->VetoEnergy()==0
-           && (p1->Detector() & Detector_t::Type_t::CB)
-           && (p2->Detector() & Detector_t::Type_t::CB)) {
-            const Particle a(ParticleTypeDatabase::Photon,comb.at(0));
-            const Particle b(ParticleTypeDatabase::Photon,comb.at(1));
-            const TLorentzVector gg = a + b;
-
-            auto cl1 = p1->FindCaloCluster();
-            if(cl1)
-                ggIM->Fill(gg.M(),cl1->CentralElement);
-
-            auto cl2 = p2->FindCaloCluster();
-            if(cl2)
-                ggIM->Fill(gg.M(),cl2->CentralElement);
+    // pedestals
+    for(const Cluster& cluster : event.Reconstructed().AllClusters()) {
+        if(!(cluster.Detector & Detector_t::Type_t::TAPSVeto))
+            continue;
+        for(const Cluster::Hit& clusterhit : cluster.Hits) {
+            /// \todo check for timing hit?
+            for(const Cluster::Hit::Datum& datum : clusterhit.Data) {
+                if(datum.Type != Channel_t::Type_t::Pedestal)
+                    continue;
+                h_pedestals->Fill(datum.Value, clusterhit.Channel);
+            }
         }
     }
+
+    // bananas
+    for(const auto& candidate : cands) {
+        if(candidate->Clusters.size() != 2)
+            continue;
+        if(candidate->Detector() & Detector_t::Type_t::TAPS &&
+           candidate->Detector() & Detector_t::Type_t::TAPSVeto
+           )
+        {
+            // search for TAPSVeto cluster
+            auto tapsveto_cluster = candidate->FindFirstCluster(Detector_t::Type_t::TAPSVeto);
+            h_bananas->Fill(candidate->ClusterEnergy(),
+                            candidate->VetoEnergy(),
+                            tapsveto_cluster->CentralElement);
+        }
+    }
+
 }
 
 void TAPSVeto_Energy::ThePhysics::Finish()
@@ -72,10 +101,22 @@ void TAPSVeto_Energy::ThePhysics::Finish()
 
 void TAPSVeto_Energy::ThePhysics::ShowResult()
 {
-    canvas(GetName()) << drawoption("colz") << ggIM << endc;
+    canvas(GetName())
+            << drawoption("colz") << h_pedestals
+            << drawoption("colz") << h_bananas->Project3D("zy")
+            << endc;
 }
 
 unique_ptr<analysis::Physics> TAPSVeto_Energy::GetPhysicsModule()
 {
-    return std_ext::make_unique<ThePhysics>(GetName());
+    return std_ext::make_unique<ThePhysics>(GetName(), tapsveto_detector->GetNChannels());
+}
+
+void TAPSVeto_Energy::GetGUIs(std::list<std::unique_ptr<gui::Manager_traits> >& guis) {
+    guis.emplace_back(std_ext::make_unique<GUI_Pedestals>(
+                          GetName(),
+                          Pedestals,
+                          calibrationManager,
+                          tapsveto_detector
+                          ));
 }

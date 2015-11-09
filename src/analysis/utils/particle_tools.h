@@ -1,13 +1,36 @@
 #pragma once
 
 #include "analysis/data/Particle.h"
+#include "base/ParticleTypeTree.h"
+
 #include <string>
 
+#include "TLorentzVector.h"
+
 class TH1;
+class TTree;
 
 namespace ant {
 namespace analysis {
 namespace utils {
+
+struct ParticleVars {
+    double E;
+    double Theta;
+    double Phi;
+    double IM;
+
+    ParticleVars(const TLorentzVector& lv, const ParticleTypeDatabase::Type& type) noexcept;
+    ParticleVars(const data::Particle& p) noexcept;
+    ParticleVars(double e=0.0, double theta=0.0, double phi=0.0, double im=0.0) noexcept:
+        E(e), Theta(theta), Phi(phi), IM(im) {}
+    ParticleVars(const ParticleVars&) = default;
+    ParticleVars(ParticleVars&&) = default;
+    ParticleVars& operator=(const ParticleVars&) =default;
+    ParticleVars& operator=(ParticleVars&&) =default;
+    virtual void SetBranches(TTree* tree, const std::string& prefix);
+    virtual void Clear();
+};
 
 struct ParticleTools {
 
@@ -16,7 +39,9 @@ struct ParticleTools {
      * @param particles
      * @return
      */
-    static std::string GetDecayString(const data::ParticleList& particles);
+    static std::string GetDecayString(const data::ParticleTree_t& particletree);
+
+    static std::string GetDecayString(const ParticleTypeTree& particletypetree);
 
     /**
      * @brief SanitizeDecayString replaces all special characters by _
@@ -27,14 +52,10 @@ struct ParticleTools {
 
 
     /** @brief Construct a string describing the production channel (e.g. gamma p -> p pi0 for pion production)
-     *        Searches for a Beam+Target pseudo partcile and uses it
-     *        and it's daughters to construct the string.
-     *        "???" is returned if no Beam+Target particle is found.
-     *        This should normally be run on the Intermediates() particle list of MCTrue data.
-     * @param particles
+     * @param particle
      * @return
      */
-    static std::string GetProductionChannelString(const data::ParticleList& particles);
+    static std::string GetProductionChannelString(const data::ParticleTree_t& particletree);
 
     /**
      * @brief Find the first Particle of given type in particle list
@@ -42,7 +63,9 @@ struct ParticleTools {
      * @param particles List to search in
      * @return The Particle found
      */
-    static const ant::analysis::data::ParticlePtr FindParticle(const ant::ParticleTypeDatabase::Type& type, const data::ParticleList& particles);
+    static const data::ParticlePtr FindParticle(const ParticleTypeDatabase::Type& type, const data::ParticleList& particles);
+
+    static const data::ParticlePtr FindParticle(const ParticleTypeDatabase::Type& type, const data::ParticleTree_t& particletree, size_t maxlevel);
 
 
     /**
@@ -52,8 +75,14 @@ struct ParticleTools {
      * @param particles list of particles
      */
     static void FillIMCombinations(TH1* h, unsigned n, const data::ParticleList& particles);
+
+    static bool SortParticleByName(const data::ParticlePtr& a, const data::ParticlePtr& b);
+
+    static bool MatchByParticleName(const data::ParticlePtr& a, const ParticleTypeDatabase::Type& b);
+
 };
 
 }
 }
+
 }

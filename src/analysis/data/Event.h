@@ -8,6 +8,7 @@
 
 #include "base/types.h"
 #include "base/printable.h"
+#include "base/Tree.h"
 
 #include <vector>
 #include <memory>
@@ -16,6 +17,7 @@
 namespace ant {
 namespace analysis {
 namespace data {
+
 
 class Event: public ant::printable_traits {
 public:
@@ -51,17 +53,19 @@ public:
                 return entry->second;
             }
 
-            std::ostream &Print(std::ostream &stream) const;
+            std::ostream& Print(std::ostream& stream) const;
         };
 
+    protected:
 
         PTypeLists   particles;      // final state / reconstructred particles
         PTypeLists   intermediates;  // intermediate particles (if any)
+        ParticleTree_t particletree; // particle tree (if available)
 
         CandidateList  candidates;     // particle candidates (if any)
         TaggerHitList  taggerhits;     // tagger hits
         TriggerInfo    triggerinfo;
-        ClusterList    insaneclusters;
+        ClusterList    allclusters;
 
 
     public:
@@ -72,6 +76,10 @@ public:
         const PTypeLists& Intermediates() const { return intermediates; }
               PTypeLists& Intermediates()       { return intermediates; }
 
+        const ParticleTree_t& ParticleTree() const { return particletree; }
+              ParticleTree_t& ParticleTree()       { return particletree; }
+
+
         const CandidateList& Candidates() const { return candidates; }
               CandidateList& Candidates()       { return candidates; }
 
@@ -81,8 +89,8 @@ public:
         const TriggerInfo& TriggerInfos() const { return triggerinfo; }
               TriggerInfo& TriggerInfos()       { return triggerinfo; }
 
-        const ClusterList& InsaneClusters() const { return insaneclusters; }
-              ClusterList& InsaneClusters()       { return insaneclusters; }
+        const ClusterList& AllClusters() const { return allclusters; }
+              ClusterList& AllClusters()       { return allclusters; }
 
 
               std::ostream& Print(std::ostream& stream) const;

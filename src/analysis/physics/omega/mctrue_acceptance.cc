@@ -7,8 +7,8 @@ using namespace ant::analysis;
 using namespace ant::analysis::physics;
 using namespace ant::analysis::data;
 
-MCTrueAcceptance::MCTrueAcceptance(PhysOptPtr opts):
-    Physics("McTrueAcceptance", opts), events_seen(0)
+MCTrueAcceptance::MCTrueAcceptance(const std::string& name,PhysOptPtr opts):
+    Physics(name, opts), events_seen(0)
 {
     detect = HistFac.makeHist<std::string>("Geometric Acceptance (MC True)","Particle Type","% events | all particles found", BinSettings(0),"detection");
     for( auto& type : ParticleTypeDatabase::DetectableTypes() ) {
@@ -36,8 +36,23 @@ MCTrueAcceptance::det_hit_count_t MCTrueAcceptance::AllAccepted(const ParticleLi
     return acc;
 }
 
+bool MCTrueAcceptance::alldetectable(const ParticleList &particles) const
+{
+    for(const auto& p : particles) {
+        if( Detector_t::Any_t::None == geo.DetectorFromAngles(p->Theta(), p->Phi()))
+            return false;
+    }
+    return true;
+}
+
 void MCTrueAcceptance::ProcessEvent(const Event &event)
 {
+
+    detect.Fill("Events", 1);
+
+    if(alldetectable(event.MCTrue().Particles().GetAll())) {
+        detect.Fill("All Detected",1);
+    }
 
     for( auto& type : ParticleTypeDatabase::DetectableTypes() ) {
 
@@ -74,4 +89,4 @@ void MCTrueAcceptance::ShowResult()
     canvas("MCTrueAcceptance") << detect << endc;
 }
 
-AUTO_REGISTER_PHYSICS(MCTrueAcceptance,"MCTrueAcceptance")
+AUTO_REGISTER_PHYSICS(MCTrueAcceptance)

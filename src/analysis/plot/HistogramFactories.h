@@ -10,6 +10,7 @@ class TDirectory;
 class TH1D;
 class TH2D;
 class TH3D;
+class TTree;
 
 namespace ant {
 namespace analysis {
@@ -19,26 +20,38 @@ private:
 
     TDirectory* dir;
 
-    TDirectory *begin_make_histogram();
-    void end_make_histogram(TDirectory* dir);
+    TDirectory *goto_dir();
+    void restore_dir(TDirectory* dir);
 
     HistogramFactory base_factory;
 
+    std::string title_prefix;
+
+    std::string MakeTitle(const std::string& title);
+
 
 public:
-    SmartHistFactory(const std::string& directory_name, TDirectory* root=nullptr);
-    SmartHistFactory(const std::string& directory_name, const SmartHistFactory &parent);
+    SmartHistFactory(const std::string& directory_name, TDirectory* root=nullptr, const std::string& title_prefix_ = "");
+    SmartHistFactory(const std::string& directory_name, const SmartHistFactory &parent, const std::string& title_prefix_ = "");
 
     void SetRootDir(TDirectory* root_dir=nullptr);
+    void SetTitlePrefix(const std::string& title_prefix_);
 
 
-
-    TH1D* makeTH1D(
+    template<class Hist = TH1D>
+    Hist* makeTH1D(
             const std::string& title,
             const std::string& xlabel,
             const std::string& ylabel,
             const BinSettings& bins,
-            const std::string& name="");
+            const std::string& name="")
+    {
+
+        TDirectory* old = goto_dir();
+        Hist* r = base_factory.Make1D<Hist>(MakeTitle(title),xlabel,ylabel,bins,name);
+        restore_dir(old);
+        return r;
+    }
 
     TH2D* makeTH2D(
             const std::string& title,
@@ -56,6 +69,8 @@ public:
             const BinSettings& ybins,
             const BinSettings& zbins,
             const std::string& name="");
+
+    TTree* makeTTree(const std::string& name);
 
 
     // Predef smart hists
@@ -89,9 +104,9 @@ public:
             const std::string& ylabel,
             const BinSettings& bins,
             const std::string& name="") {
-        TDirectory* old = begin_make_histogram();
+        TDirectory* old = goto_dir();
             SmartHist1<T> r = SmartHist1<T>::makeHist(func,title,xlabel,ylabel,bins,name,base_factory);
-        end_make_histogram(old);
+        restore_dir(old);
         return std::move(r);
     }
 
@@ -102,9 +117,9 @@ public:
             const std::string& ylabel,
             const BinSettings& bins,
             const std::string& name="") {
-        TDirectory* old = begin_make_histogram();
+        TDirectory* old = goto_dir();
             SmartHist1<T> r = SmartHist1<T>::makeHist(title,xlabel,ylabel,bins,name,base_factory);
-        end_make_histogram(old);
+        restore_dir(old);
         return std::move(r);
     }
 

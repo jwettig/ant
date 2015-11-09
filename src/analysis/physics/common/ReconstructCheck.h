@@ -59,6 +59,7 @@ protected:
 
         TH1D* nCharged;
         TH2D* cluserSize;
+        TH2D* cluserSize_true;
         TH2D* dEE;
         TH2D* dEE_true;
         std::unique_ptr<PositionMap> posCharged;
@@ -84,7 +85,7 @@ protected:
         std::unique_ptr<PositionMap> makePosMap(SmartHistFactory& f, detectortype d, const std::string& name, const std::string title="");
 
         histgroup(SmartHistFactory& f, const std::string& prefix, detectortype d=detectortype::All);
-        void Fill(const data::ParticlePtr& mctrue, const data::CandidateList& cand, const data::ClusterList& insane);
+        void Fill(const data::ParticlePtr& mctrue, const data::CandidateList& cand, const data::ClusterList& all_clusters);
         void ShowResult() const;
         void Finish();
 
@@ -109,8 +110,27 @@ protected:
     histgroup all_group;
     TAPSVetoMatch tapsveto;
 
+
+    bool mult1_only = false;
+
+    TTree* tree = nullptr;
+
+    unsigned b_mult = 0;
+
+    double b_rE     = 0.0;
+    double b_rTheta = 0.0;
+    double b_rPhi   = 0.0;
+    double b_rVeto  = 0.0;
+    double b_rTime  = 0.0;
+    unsigned b_rSize = 0;
+
+    double b_tE = 0.0;
+    double b_tTheta = 0.0;
+    double b_tPhi = 0.0;
+    unsigned b_Cal = 0;
+
 public:
-    ReconstructCheck(PhysOptPtr opts);
+    ReconstructCheck(const std::string& name, PhysOptPtr opts);
 
     void ProcessEvent(const data::Event &event) override;
     void Finish() override;

@@ -82,7 +82,7 @@ struct ReconstructTester : Reconstruct_traits {
 
         // then build clusters (at least for calorimeters this is not trivial)
         Reconstruct::sorted_bydetectortype_t<TCluster> sorted_clusters;
-        r.BuildClusters(move(sorted_clusterhits), sorted_clusters, event->InsaneClusters);
+        r.BuildClusters(move(sorted_clusterhits), sorted_clusters);
         size_t n_clusters = getTotalCount(sorted_clusters);
         REQUIRE(n_clusters>0);
         REQUIRE(n_clusters <= n_clusterhits);
@@ -93,14 +93,26 @@ struct ReconstructTester : Reconstruct_traits {
         }
 
         // finally, do the candidate building
-        const auto n_insane_before = event->InsaneClusters.size();
-        r.candidatebuilder->Build(move(sorted_clusters), event->Candidates, event->InsaneClusters);
+        const auto n_all_before = event->AllClusters.size();
+        REQUIRE(n_all_before==0);
+        r.candidatebuilder->Build(move(sorted_clusters), event->Candidates, event->AllClusters);
 
-        size_t n_candidates = event->Candidates.size();
-        const auto n_insane_after = event->InsaneClusters.size();
-        REQUIRE(n_insane_after>=n_insane_before);
-        const auto n_insane_added = n_insane_after - n_insane_before;
-        REQUIRE(n_candidates + n_insane_added <= n_clusters);
+        const auto n_all_after = event->AllClusters.size();
+        REQUIRE(n_all_after>=n_all_before);
+        const auto n_all_added = n_all_after - n_all_before;
+        REQUIRE(n_all_added == n_clusters);
+
+        bool matched_clusters = false;
+        for(auto cluster : event->AllClusters) {
+            if(!cluster.HasFlag(TCluster::Flags_t::Unmatched)) {
+                matched_clusters = true;
+                break;
+            }
+        }
+        if(matched_clusters) {
+            const size_t n_candidates = event->Candidates.size();
+            REQUIRE(n_candidates>0);
+        }
 
         return event;
     }
@@ -109,6 +121,8 @@ struct ReconstructTester : Reconstruct_traits {
 
 
 void dotest() {
+    ExpConfig::Setup::ManualName = "Setup_Test";
+
     auto unpacker = Unpacker::Get(string(TEST_BLOBS_DIRECTORY)+"/Acqu_oneevent-big.dat.xz");
 
     // instead of the usual reconstruct, we use our tester
@@ -139,8 +153,8 @@ void dotest() {
     }
 
     REQUIRE(nReads == 221);
-    REQUIRE(nHits == 29418);
-    REQUIRE(nCandidates == 821);
+    REQUIRE(nHits == 30039);
+    REQUIRE(nCandidates == 822);
 
 
 }

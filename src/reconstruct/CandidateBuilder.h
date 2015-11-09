@@ -42,18 +42,26 @@ protected:
 
     void Build_PID_CB(
             std::map<Detector_t::Type_t, std::list< TCluster > >& sorted_clusters,
-            TEvent::candidates_t& candidates
+            TEvent::candidates_t& candidates,
+            std::vector<TCluster>& all_clusters
             );
 
     void Build_TAPS_Veto(
             std::map<Detector_t::Type_t, std::list< TCluster > >& sorted_clusters,
-            TEvent::candidates_t& candidates
+            TEvent::candidates_t& candidates,
+            std::vector<TCluster>& all_clusters
             );
 
     void Catchall(
             std::map<Detector_t::Type_t, std::list< TCluster > >& sorted_clusters,
-            TEvent::candidates_t& candidates
+            TEvent::candidates_t& candidates,
+            std::vector<TCluster>& all_clusters
             );
+
+    virtual void BuildCandidates(
+            std::map<Detector_t::Type_t, std::list<TCluster> >& sorted_clusters,
+            TEvent::candidates_t& candidates,
+            std::vector<TCluster>& all_clusters);
 
 public:
 
@@ -65,9 +73,10 @@ public:
     // this method shall fill the TEvent reference
     // with tracks built from the given sorted clusters
     /// \todo make this method abstract and create proper derived Candidate builders
-    virtual void Build(std::map<Detector_t::Type_t, std::list<TCluster> > sorted_clusters,
+    virtual void Build(
+            std::map<Detector_t::Type_t, std::list<TCluster> > sorted_clusters,
             TEvent::candidates_t& candidates,
-            std::vector<TCluster>& insane_clusters
+            std::vector<TCluster>& all_clusters
             );
 };
 

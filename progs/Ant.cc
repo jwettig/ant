@@ -12,6 +12,7 @@
 #include "analysis/physics/PhysicsManager.h"
 
 #include "expconfig/ExpConfig.h"
+#include "expconfig/setups/SetupRegistry.h"
 
 #include "unpacker/Unpacker.h"
 #include "unpacker/RawFileReader.h"
@@ -66,7 +67,7 @@ int main(int argc, char** argv) {
         const string arg1(argv[1]);
 
         if(arg1 == "--list-physics") {
-            for(const auto& name : analysis::PhysicsRegistry::get().GetList()) {
+            for(const auto& name : analysis::PhysicsRegistry::GetList()) {
                 cout << name << endl;
             }
             return 0;
@@ -85,7 +86,7 @@ int main(int argc, char** argv) {
 
                 const string setup_name(argv[2]);
 
-                ExpConfig::ManualSetupName = setup_name;
+                ExpConfig::Setup::ManualName = setup_name;
                 const auto setup = ExpConfig::Setup::GetLastFound();
 
                 if(setup) {
@@ -106,16 +107,17 @@ int main(int argc, char** argv) {
 
     TCLAP::ValuesConstraintExtra<decltype(ExpConfig::Setup::GetNames())> allowedsetupnames(ExpConfig::Setup::GetNames());
     auto cmd_setup  = cmd.add<TCLAP::ValueArg<string>>("s","setup","Choose setup manually by name",false,"", &allowedsetupnames);
+    auto cmd_setupOptions = cmd.add<TCLAP::MultiArg<string>>("S","setup_options","Options for setup, key=value",false,"");
 
     auto cmd_maxevents = cmd.add<TCLAP::ValueArg<int>>("m","maxevents","Process only max events",false, 0, "maxevents");
 
-    TCLAP::ValuesConstraintExtra<decltype(analysis::PhysicsRegistry::get().GetList())> allowedPhysics(analysis::PhysicsRegistry::get().GetList());
+    TCLAP::ValuesConstraintExtra<decltype(analysis::PhysicsRegistry::GetList())> allowedPhysics(analysis::PhysicsRegistry::GetList());
     auto cmd_physicsclasses  = cmd.add<TCLAP::MultiArg<string>>("p","physics","Physics class to run", false, &allowedPhysics);
 
     auto cmd_output = cmd.add<TCLAP::ValueArg<string>>("o","output","Output file",false,"","filename");
 
-    auto cmd_physicsOptions = cmd.add<TCLAP::MultiArg<string>>("O","options","Options for physics classes, key=value",false,"");
-    auto cmd_physicsclasses_opt = cmd.add<TCLAP::MultiArg<string>>("P","physics-opt","Physics class to run, with optiosn: PhysicsClass:key=val,key=val", false, "");
+    auto cmd_physicsOptions = cmd.add<TCLAP::MultiArg<string>>("O","options","Options for all physics classes, key=value",false,"");
+    auto cmd_physicsclasses_opt = cmd.add<TCLAP::MultiArg<string>>("P","physics-opt","Physics class to run, with options: PhysicsClass:key=val,key=val", false, "");
 
     auto cmd_batchmode = cmd.add<TCLAP::SwitchArg>("b","batch","Run in batch mode (no ROOT shell afterwards)",false);
 
@@ -160,6 +162,16 @@ int main(int argc, char** argv) {
         }
     }
 
+    // parse the setup options and tell the registry
+    std::shared_ptr<OptionsList> setup_opts = make_shared<OptionsList>();
+    if(cmd_setupOptions->isSet()) {
+        for(const auto& opt : cmd_setupOptions->getValue()) {
+            setup_opts->SetOption(opt);
+        }
+        ant::expconfig::SetupRegistry::SetSetupOptions(setup_opts);
+    }
+
+
     // build the list of ROOT files first
     auto rootfiles = make_shared<WrapTFileInput>();
     for(const auto& inputfile : cmd_input->getValue()) {
@@ -181,19 +193,19 @@ int main(int argc, char** argv) {
         if(unpackerFile->GetUniqueHeaderInfo(headerInfo)) {
             VLOG(5) << "Found unique header info " << headerInfo;
             if(!headerInfo.SetupName.empty()) {
-                ExpConfig::ManualSetupName = headerInfo.SetupName;
-                LOG(INFO) << "Using header info to manually set the setup name to " << ExpConfig::ManualSetupName;
+                ExpConfig::Setup::ManualName = headerInfo.SetupName;
+                LOG(INFO) << "Using header info to manually set the setup name to " << ExpConfig::Setup::ManualName;
             }
         }
     }
 
     // override the setup name from cmd line
     if(cmd_setup->isSet()) {
-        ExpConfig::ManualSetupName = cmd_setup->getValue();
-        if(ExpConfig::ManualSetupName.empty())
+        ExpConfig::Setup::ManualName = cmd_setup->getValue();
+        if(ExpConfig::Setup::ManualName.empty())
             LOG(INFO) << "Commandline override to auto-search for setup config (might fail)";
         else
-            LOG(INFO) << "Commandline override setup name to '" << ExpConfig::ManualSetupName << "'";
+            LOG(INFO) << "Commandline override setup name to '" << ExpConfig::Setup::ManualName << "'";
     }
 
 
@@ -260,7 +272,11 @@ int main(int argc, char** argv) {
         readers.push_back(move(unpacker_reader));
     }
 
-    readers.push_back(std_ext::make_unique<analysis::input::PlutoReader>(rootfiles));
+    // the unpackers might have figured out what setup to use...
+    auto setup = ExpConfig::Setup::GetLastFound();
+    auto tagger = setup ? setup->GetDetector<TaggerDetector_t>() : nullptr;
+
+    readers.push_back(std_ext::make_unique<analysis::input::PlutoReader>(rootfiles, tagger));
     readers.push_back(std_ext::make_unique<analysis::input::GoatReader>(rootfiles));
 
     // create the list of enabled calibrations here,
@@ -268,7 +284,6 @@ int main(int argc, char** argv) {
     // of finding the config, so that we can simply ask the ExpConfig now
     list<shared_ptr<Calibration::PhysicsModule>> enabled_calibrations;
     if(cmd_calibrations->isSet()) {
-        auto setup = ExpConfig::Setup::GetLastFound();
         if(setup==nullptr) {
             stringstream ss_setups;
             for(auto name : ExpConfig::Setup::GetNames()) {

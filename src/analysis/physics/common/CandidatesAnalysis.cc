@@ -11,8 +11,8 @@ using namespace ant::analysis;
 using namespace ant::analysis::physics;
 using namespace ant::analysis::data;
 
-CandidatesAnalysis::CandidatesAnalysis(PhysOptPtr opts):
-    Physics("CandidatesAnalysis",opts)
+CandidatesAnalysis::CandidatesAnalysis(const std::string& name, PhysOptPtr opts):
+    Physics(name,opts)
 {
     nCandidatesEvent = HistFac.makeTH1D("Candidates/Event","Candidates","",BinSettings(15),"nCand");
     CandMultiplicities = HistFac.makeTH1D("Candidates Multi","","",BinSettings(15),"CandMult");
@@ -99,4 +99,4 @@ void CandidatesAnalysis::ShowResult()
             << endc;
 }
 
-AUTO_REGISTER_PHYSICS(CandidatesAnalysis, "CandidatesAnalysis")
+AUTO_REGISTER_PHYSICS(CandidatesAnalysis)

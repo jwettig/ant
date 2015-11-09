@@ -17,7 +17,7 @@ protected:
     T _stop;
 
 public:
-    interval( const T& start=0.0, const T& stop=0.0 ): _start(start), _stop(stop) {}
+    constexpr interval( const T& start=0.0, const T& stop=0.0 ) noexcept : _start(start), _stop(stop) {}
 
     /**
      * @brief Factory Function: Create interval from center and widht
@@ -25,7 +25,7 @@ public:
      * @param width the width
      * @return an interval that spans symmetrically around center with given width
      */
-    static interval CenterWidth( const T center, const T width) {
+    constexpr static interval CenterWidth( const T center, const T width) {
         return std::move( interval(center - width/2.0, center + width/2.0));
     }
 
@@ -35,37 +35,37 @@ public:
      * @brief Get the lower boundary
      * @return start position
      */
-    const T& Start() const { return _start; }
+    const constexpr T& Start() const noexcept { return _start; }
 
     /**
      * @brief Get the lower boundary
      * @return start position
      */
-    T& Start() { return _start; }
+    T& Start() noexcept { return _start; }
 
     /**
      * @brief Get the upper boundary
      * @return
      */
-    const T& Stop()  const { return _stop; }
+    constexpr const T& Stop() const noexcept { return _stop; }
 
     /**
      * @brief Get the upper boundary
      * @return
      */
-    T& Stop() { return _stop; }
+    T& Stop() noexcept { return _stop; }
 
     /**
      * @brief Get the length of the interval
      * @return length
      */
-    T Length() const { return Stop() - Start(); }
+    constexpr T Length() const noexcept { return Stop() - Start(); }
 
     /**
      * @brief Get the center
      * @return center
      */
-    T Center() const { return (Start() + Stop()) / 2.0; }
+    constexpr T Center() const noexcept { return (Start() + Stop()) / 2.0; }
 
     /**
      * @brief Add a value to both boundaries. This shifts the interval to higher values.
@@ -145,11 +145,11 @@ public:
         }
     }
 
-    bool operator == (const interval<T>& rhs) const {
+    constexpr bool operator == (const interval<T>& rhs) const noexcept {
         return Start() == rhs.Start() && Stop() == rhs.Stop();
     }
 
-    bool operator != (const interval<T>& rhs) const {
+    constexpr bool operator != (const interval<T>& rhs) const noexcept {
         return !(*this == rhs);
     }
 

@@ -13,6 +13,7 @@ set(SRCS
     modules/CB_Energy.cc
     modules/CB_TimeWalk.cc
     modules/TAPS_Energy.cc
+    modules/TAPS_ShortEnergy.cc
     modules/PID_Energy.cc
     modules/PID_PhiAngle.cc
     modules/TAPSVeto_Energy.cc
@@ -24,13 +25,12 @@ set(SRCS
     gui/Manager.cc
     gui/Manager_traits.h
     gui/ManagerWindow.cc
-	gui/EditorCanvas.cc
-	gui/EditorWindow.cc
+    gui/EditorCanvas.cc
+    gui/EditorWindow.cc
     gui/Indicator_traits.h
     gui/Indicator.cc
     gui/CalCanvas.cc
     gui/AvgBuffer.h
-    gui/ACECanvas.cc
     gui/Dialogs.cc
     fitfunctions/BaseFunctions.cc
     fitfunctions/KnobsTF1.cc

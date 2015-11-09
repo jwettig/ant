@@ -28,9 +28,8 @@ void AdaptorTClusterHit::SetFields(const TDetectorReadHit *readhit) {
         Time = readhit->Values[0];
 }
 
-Clustering::Clustering(const shared_ptr<ExpConfig::Reconstruct>& config)
+Clustering::Clustering(const shared_ptr<ExpConfig::Reconstruct>&)
 {
-    cluster_thresholds = config->GetClusterThresholds();
 }
 
 void Clustering::Build(
@@ -43,15 +42,25 @@ void Clustering::Build(
     list<clustering::crystal_t> crystals;
     for(const AdaptorTClusterHit& clusterhit : clusterhits) {
         const auto& hit = clusterhit.Hit;
-        // ignore hits without energy information
-        if(!isfinite(clusterhit.Energy))
+        // ignore hits without energy or time information
+        if(!isfinite(clusterhit.Energy) || !isfinite(clusterhit.Time)) {
+            // we're not allowed to throw anything away
+            // so add some strange single hit cluster with no energy information here
+            clusters.emplace_back(
+                        clusterdetector->GetPosition(hit->Channel),
+                        clusterhit.Energy,
+                        clusterhit.Time,
+                        clusterdetector->Type,
+                        hit->Channel,
+                        vector<TClusterHit>{*hit}
+                        );
             continue;
+        }
         crystals.emplace_back(
                     clusterhit.Energy,
                     clusterdetector->GetClusterElement(hit->Channel),
                     addressof(clusterhit)
                     );
-
     }
 
     // do the clustering (calls detail/Clustering_NextGen.h code)
@@ -59,18 +68,10 @@ void Clustering::Build(
     clustering::do_clustering(crystals, crystal_clusters);
 
     // now calculate some cluster properties,
-    // and create TCluster out of it (if they pass the energy threshold)
-
-    const auto it_threshold = cluster_thresholds.find(clusterdetector->Type);
-    const double threshold = it_threshold == cluster_thresholds.cend() ? 20 : it_threshold->second;
+    // and create TCluster out of it
 
     for(const clustering::cluster_t& cluster : crystal_clusters) {
         const double cluster_energy = clustering::calc_total_energy(cluster);
-
-        // discard low energetic clusters
-        if(cluster_energy<threshold) {
-            continue;
-        }
 
         TVector3 weightedPosition(0,0,0);
         double weightedSum = 0;
@@ -81,7 +82,6 @@ void Clustering::Build(
 
         std::vector<TClusterHit> clusterhits;
         clusterhits.reserve(cluster.size());
-
 
         for(const clustering::crystal_t& crystal : cluster) {
             double wgtE = clustering::calc_energy_weight(crystal.Energy, cluster_energy);

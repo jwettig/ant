@@ -56,11 +56,28 @@ std::string Setup::GetPIDCutsDirectory() const {
     return std::string(ANT_PATH_DATABASE)+"/"+GetName()+"/cuts";
 }
 
-Setup::Setup(const std::string& name) :
-    name_(name)
+Setup::Setup(const std::string& name, SetupOptPtr opt) :
+    name_(name),
+    options(opt)
 {
     std::string calibrationDataFolder = std::string(ANT_PATH_DATABASE)+"/"+GetName()+"/calibration";
     calibrationDataManager = std::make_shared<calibration::DataManager>(calibrationDataFolder);
+}
+
+std::string Setup::GetOption(const std::string& key) const
+{
+    if(options) {
+        return options->GetOption(key);
+    }
+    return "";
+}
+
+bool Setup::IsFlagSet(const std::string& key) const
+{
+    if(options) {
+        return options->IsFlagSet(key);
+    }
+    return false;
 }
 
 bool Setup::Matches(const ant::THeaderInfo& header) const {
@@ -105,9 +122,3 @@ void Setup::IgnoreDetectorChannels(ant::Detector_t::Type_t type, const std::vect
     for(unsigned channel : channels)
         IgnoreDetectorChannel(type, channel);
 }
-
-std::shared_ptr<ant::calibration::DataManager> Setup::CreateCalibrationDataManager(const std::string& setupname) {
-    std::string filename = std::string(ANT_PATH_DATABASE)+"/"+setupname+"/calibration.root";
-    return std::make_shared<calibration::DataManager>(filename);
-}
-

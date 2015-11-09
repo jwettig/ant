@@ -5,14 +5,14 @@
 
 #include "TMath.h"
 #include "TDirectory.h"
-#include "TH1D.h"
+#include "TTree.h"
 
 using namespace ant::analysis;
 using namespace ant::analysis::data;
 using namespace std;
 
 
-TDirectory *SmartHistFactory::begin_make_histogram()
+TDirectory *SmartHistFactory::goto_dir()
 {
     TDirectory* old = gDirectory;
     if(dir)
@@ -21,22 +21,21 @@ TDirectory *SmartHistFactory::begin_make_histogram()
     return old;
 }
 
-void SmartHistFactory::end_make_histogram(TDirectory* dir)
+void SmartHistFactory::restore_dir(TDirectory* dir)
 {
     if(dir)
         dir->cd();
 }
 
-SmartHistFactory::SmartHistFactory(const string &directory_name, const SmartHistFactory& parent)
-  : dir(), base_factory()
+string SmartHistFactory::MakeTitle(const string& title)
 {
-    dir = parent.dir->mkdir(directory_name.c_str());
-    if(!dir)
-        dir=gDirectory;
+    if(title_prefix.empty())
+        return title;
+    return title_prefix+": "+title;
 }
 
-SmartHistFactory::SmartHistFactory(const string &directory_name, TDirectory* root)
-  : dir(), base_factory()
+SmartHistFactory::SmartHistFactory(const string &directory_name, TDirectory* root, const string& title_prefix_)
+  : dir(), base_factory(), title_prefix(title_prefix_)
 {
 
     if(!root)
@@ -48,21 +47,28 @@ SmartHistFactory::SmartHistFactory(const string &directory_name, TDirectory* roo
         dir=gDirectory;
 }
 
-TH1D *SmartHistFactory::makeTH1D(const string &title, const string &xlabel, const string &ylabel, const BinSettings &bins, const string &name)
+
+SmartHistFactory::SmartHistFactory(const string &directory_name, const SmartHistFactory& parent, const string& title_prefix_)
+  : dir(), base_factory(), title_prefix(title_prefix_)
 {
-
-    TDirectory* old = begin_make_histogram();
-    TH1D* r = base_factory.Make1D(title,xlabel,ylabel,bins,name);
-    end_make_histogram(old);
-    return r;
-
+    dir = parent.dir->mkdir(directory_name.c_str());
+    if(!dir)
+        dir=gDirectory;
 }
+
+void SmartHistFactory::SetTitlePrefix(const string& title_prefix_)
+{
+    title_prefix = title_prefix_;
+}
+
+
+
 
 TH2D *SmartHistFactory::makeTH2D(const string &title, const string &xlabel, const string &ylabel, const BinSettings &xbins, const BinSettings &ybins, const string &name)
 {
-    TDirectory* old = begin_make_histogram();
-    TH2D* r = base_factory.Make2D(title,xlabel,ylabel,xbins,ybins,name);
-    end_make_histogram(old);
+    TDirectory* old = goto_dir();
+    TH2D* r = base_factory.Make2D(MakeTitle(title),xlabel,ylabel,xbins,ybins,name);
+    restore_dir(old);
     return r;
 }
 
@@ -75,17 +81,25 @@ TH3D *SmartHistFactory::makeTH3D(const string &title,
                                  const BinSettings &zbins,
                                  const string &name)
 {
-    TDirectory* old = begin_make_histogram();
-    TH3D* r = base_factory.Make3D(title,xlabel,ylabel,zlabel,xbins,ybins,zbins,name);
-    end_make_histogram(old);
+    TDirectory* old = goto_dir();
+    TH3D* r = base_factory.Make3D(MakeTitle(title),xlabel,ylabel,zlabel,xbins,ybins,zbins,name);
+    restore_dir(old);
     return r;
+}
+
+TTree*SmartHistFactory::makeTTree(const string& name)
+{
+    TDirectory* old = goto_dir();
+    TTree* t = new TTree(name.c_str(), name.c_str());
+    restore_dir(old);
+    return t;
 }
 
 SmartHist1<const ParticlePtr &> SmartHistFactory::InvariantMass(const string &title, const string &xlabel, const string &ylabel, BinSettings bins, const string &name)
 {
     return makeHist<const ParticlePtr&>(
                 [] (const ParticlePtr& p) { return p->M();},
-            title,
+            MakeTitle(title),
             xlabel,
             ylabel,
             bins,
@@ -96,7 +110,7 @@ SmartHist1<const ParticlePtr &> SmartHistFactory::ThetaAngle(const string &title
 {
     return makeHist<const ParticlePtr&>(
                 [] (const ParticlePtr& p) { return p->Theta() * TMath::DegToRad();},
-            title,
+            MakeTitle(title),
             xlabel,
             ylabel,
             bins,
@@ -107,7 +121,7 @@ SmartHist1<const ParticlePtr &> SmartHistFactory::KinEnergyPlot(const string &ti
 {
     return makeHist<const ParticlePtr&>(
                 [] (const ParticlePtr& p) { return p->Ek();},
-            title,
+            MakeTitle(title),
             xlabel,
             ylabel,
             bins,
@@ -116,9 +130,9 @@ SmartHist1<const ParticlePtr &> SmartHistFactory::KinEnergyPlot(const string &ti
 
 TH1D *SmartHistFactory::copyTH1D(TH1D *hist, const std::string& newname)
 {
-    TDirectory* old = begin_make_histogram();
-        TH1D* newhist = (TH1D*)hist->Clone(newname.c_str());
-    end_make_histogram(old);
+    TDirectory* old = goto_dir();
+    TH1D* newhist = (TH1D*)hist->Clone(newname.c_str());
+    restore_dir(old);
     return newhist;
 }
 

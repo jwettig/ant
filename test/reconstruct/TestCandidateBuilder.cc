@@ -36,13 +36,13 @@ struct counts_t {
     int clusters = 0;
     int candidates = 0;
     int candidateclusters = 0;
-    int insaneclusters = 0;
+    int allclusters = 0;
 
     counts_t operator-(const counts_t& other) {
         clusters -= other.clusters;
         candidates -= other.candidates;
         candidateclusters -= other.candidateclusters;
-        insaneclusters -= other.insaneclusters;
+        allclusters -= other.allclusters;
         return *this;
     }
 
@@ -51,11 +51,11 @@ struct counts_t {
 counts_t getCounts(
         const std::map<Detector_t::Type_t, std::list<TCluster> >& sorted_clusters,
         const TEvent::candidates_t& candidates,
-        const std::vector<TCluster>& insane_clusters) {
+        const std::vector<TCluster>& all_clusters) {
     counts_t counts;
     counts.clusters = getTotalCount(sorted_clusters);
     counts.candidates = candidates.size();
-    counts.insaneclusters = insane_clusters.size();
+    counts.allclusters = all_clusters.size();
     for(const auto& cand : candidates)
         counts.candidateclusters += cand.Clusters.size();
     return counts;
@@ -68,48 +68,61 @@ struct CandidateBuilderTester : CandidateBuilder {
 
     using CandidateBuilder::CandidateBuilder; // use base class constructors
 
-    virtual void Build(std::map<Detector_t::Type_t, std::list<TCluster> > sorted_clusters,
+    virtual void BuildCandidates(std::map<Detector_t::Type_t, std::list<TCluster> >& sorted_clusters,
             TEvent::candidates_t& candidates,
-            std::vector<TCluster>& insane_clusters
-            ) {
+            std::vector<TCluster>& all_clusters
+            ) override {
 
         counts_t before;
         counts_t after;
         counts_t diff;
 
-        before = getCounts(sorted_clusters, candidates, insane_clusters);
+        before = getCounts(sorted_clusters, candidates, all_clusters);
         if(cb && pid)
-            Build_PID_CB(sorted_clusters, candidates);
-        after = getCounts(sorted_clusters, candidates, insane_clusters);
+            Build_PID_CB(sorted_clusters, candidates, all_clusters);
+        after = getCounts(sorted_clusters, candidates, all_clusters);
         diff = after - before;
         REQUIRE(diff.candidateclusters + diff.clusters == 0);
 
-        before = getCounts(sorted_clusters, candidates, insane_clusters);
+        before = getCounts(sorted_clusters, candidates, all_clusters);
         if(taps && tapsveto)
-            Build_TAPS_Veto(sorted_clusters, candidates);
-        after = getCounts(sorted_clusters, candidates, insane_clusters);
+            Build_TAPS_Veto(sorted_clusters, candidates, all_clusters);
+        after = getCounts(sorted_clusters, candidates, all_clusters);
         diff = after - before;
         REQUIRE(diff.candidateclusters + diff.clusters == 0);
 
 
-        before = getCounts(sorted_clusters, candidates, insane_clusters);
-
-        Catchall(sorted_clusters, candidates);
-
-        // move the rest to insane clusters
-        for(auto& det_entry : sorted_clusters) {
-            for(auto& cluster : det_entry.second) {
-                insane_clusters.emplace_back(cluster);
-            }
-        }
-        sorted_clusters.clear();
-
-        after = getCounts(sorted_clusters, candidates, insane_clusters);
+        before = getCounts(sorted_clusters, candidates, all_clusters);
+        Catchall(sorted_clusters, candidates, all_clusters);
+        after = getCounts(sorted_clusters, candidates, all_clusters);
         diff = after - before;
+        REQUIRE(diff.candidateclusters + diff.clusters == 0);
+    }
 
-        REQUIRE(diff.candidateclusters == diff.candidates);
-        REQUIRE(diff.insaneclusters + diff.candidateclusters + diff.clusters == 0);
+    virtual void Build(std::map<Detector_t::Type_t, std::list<TCluster> > sorted_clusters,
+            TEvent::candidates_t& candidates,
+            std::vector<TCluster>& all_clusters
+            ) override {
+        counts_t before;
+        counts_t after;
 
+        before = getCounts(sorted_clusters, candidates, all_clusters);
+        REQUIRE(before.allclusters==0);
+        REQUIRE(before.candidateclusters==0);
+        REQUIRE(before.candidates==0);
+        REQUIRE(before.clusters>0);
+        CandidateBuilder::Build(sorted_clusters, candidates, all_clusters);
+        after = getCounts(sorted_clusters, candidates, all_clusters);
+        REQUIRE(before.clusters == after.allclusters);
+
+        // examine unmatched flag clusters
+        size_t unmatched_clusters = 0;
+        for(auto cluster : all_clusters) {
+            if(cluster.HasFlag(TCluster::Flags_t::Unmatched))
+                unmatched_clusters++;
+        }
+        REQUIRE(unmatched_clusters>0);
+        REQUIRE(all_clusters.size() - unmatched_clusters == after.candidateclusters);
     }
 };
 
@@ -127,6 +140,7 @@ struct ReconstructTester : Reconstruct {
 
 
 void dotest() {
+    ant::ExpConfig::Setup::ManualName = "Setup_Test";
     auto unpacker = Unpacker::Get(string(TEST_BLOBS_DIRECTORY)+"/Acqu_oneevent-big.dat.xz");
 
     // instead of the usual reconstruct, we use our tester

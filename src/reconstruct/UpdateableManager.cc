@@ -15,10 +15,11 @@ using namespace ant;
 using namespace ant::reconstruct;
 
 
-UpdateableManager::UpdateableManager(
-        const TID& startPoint,
-        const std::list<std::shared_ptr<Updateable_traits> >& updateables
-        )
+UpdateableManager::UpdateableManager(const TID& startPoint,
+        const std::list<std::shared_ptr<Updateable_traits> >& updateables_
+        ) :
+    updateables(updateables_),
+    lastFlagsSeen(startPoint)
 {
 
     // ask each updateable for its update points and
@@ -27,16 +28,10 @@ UpdateableManager::UpdateableManager(
     map<TID, shared_ptr_list<Updateable_traits> > sorted_updateables;
     for(const shared_ptr<Updateable_traits>& updateable : updateables)
     {
-        vector<list<TID>> all_changePoints = updateable->GetChangePoints();
-        vector<bool> updateOnFirstEvent = updateable->UpdateOnFirstEvent();
-        // if empty, we assume nothing should be updated on first event
-        if(updateOnFirstEvent.empty())
-            updateOnFirstEvent.resize(all_changePoints.size(), false);
-        // check if updateable returned consistent data,
-        // anything else is an implementation error
-        if(updateOnFirstEvent.size() != all_changePoints.size())
-            throw runtime_error("Inconsistent GetChangePoints/UpdateOnFirstEvent data found");
+        // tell TID
+        updateable->UpdatedTIDFlags(startPoint);
 
+        vector<list<TID>> all_changePoints = updateable->GetChangePoints();
 
         // the following extraction relies on the changepoints being sorted in time
         // we don't require the updateables to provide a sorted list
@@ -44,8 +39,7 @@ UpdateableManager::UpdateableManager(
         {
             auto& lst = all_changePoints[i];
 
-            if(updateOnFirstEvent[i])
-                lst.push_back(startPoint);
+            lst.push_back(startPoint);
 
             // no change points means the updateable is constant
             if (lst.empty())
@@ -97,6 +91,12 @@ UpdateableManager::UpdateableManager(
 
 void UpdateableManager::UpdateParameters(const TID& currentPoint)
 {
+    if(currentPoint.Flags != lastFlagsSeen.Flags) {
+        for(auto updateable : updateables)
+            updateable->UpdatedTIDFlags(currentPoint);
+        lastFlagsSeen = currentPoint;
+    }
+
     // it might be that the current point lies far in the future
     // so calling Update() more than once is necessary
     while(!changePoints.empty() && changePoints.front().first <= currentPoint) {

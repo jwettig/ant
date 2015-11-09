@@ -21,12 +21,14 @@ namespace ant {
 
 class THeaderInfo;
 class Updateable_traits;
+namespace calibration {
+class DataManager;
+}
 
 class ExpConfig
 {
 public:
 
-    static std::string ManualSetupName;
 
     // all configs have a common base and should match via THeaderInfo
     class Base {
@@ -38,12 +40,15 @@ public:
     // the ExpConfig::Setup provides general information about the experiment
     class Setup : public virtual Base {
     public:
+        static std::string ManualName;
+
         virtual std::string GetName() const = 0;
         virtual double GetElectronBeamEnergy() const = 0;
         virtual std::list< std::shared_ptr< Calibration::PhysicsModule> > GetCalibrations() const = 0;
         virtual std::string GetPIDCutsDirectory() const = 0;
+        virtual std::shared_ptr<calibration::DataManager> GetCalibrationDataManager() const = 0;
 
-        // you may obtain such an Expconfig::Module via headerInfo, name,
+        // you may obtain such an Expconfig::Setup via headerInfo, name,
         // get all of them, or the last found one
         static std::shared_ptr<Setup> Get(const THeaderInfo& header);
         static std::shared_ptr<Setup> Get(const std::string& name);
@@ -54,10 +59,10 @@ public:
         template<typename DetectorType>
         static std::shared_ptr<DetectorType> GetDetector();
 
-
         static void Cleanup();
     private:
-        static std::list< std::shared_ptr<Setup> > getAll();
+        friend class ExpConfig;
+        static std::shared_ptr<Setup> lastFound;
     };
 
     // in order to run the Reconstruction,
@@ -68,14 +73,11 @@ public:
         virtual std::list< std::shared_ptr< Detector_t > > GetDetectors() const = 0;
         virtual std::list< std::shared_ptr< Updateable_traits> > GetUpdateables() const = 0;
 
-        // for clustering, may be extended to config struct
-        // (e.g. for position weighting options)
-        using cluster_thresholds_t = std::map<Detector_t::Type_t, double>;
-        virtual cluster_thresholds_t  GetClusterThresholds() const = 0;
-
         struct candidatebuilder_config_t {
             /// @see ant::reconstruct::CandidateBuilder::PID_phi_epsilon
-            double PID_Phi_Epsilon = 0.0;
+            double PID_Phi_Epsilon = 0.0;      // in Rad
+            double CB_ClusterThreshold = 15;   // in MeV
+            double TAPS_ClusterThreshold = 20; // in MeV
             candidatebuilder_config_t() = default;
         };
 
@@ -105,8 +107,6 @@ public:
 private:
     template<typename T>
     static std::shared_ptr<T> Get_(const THeaderInfo& header);
-    static std::shared_ptr<Setup> lastSetupFound;
-
 };
 
 template<typename DetectorType>

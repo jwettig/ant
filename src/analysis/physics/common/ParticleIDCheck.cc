@@ -11,8 +11,8 @@ using namespace ant::analysis;
 using namespace ant::analysis::physics;
 using namespace ant::analysis::data;
 
-ParticleIDCheck::ParticleIDCheck(PhysOptPtr opts):
-    Physics("ParticleIDCheck", opts),
+ParticleIDCheck::ParticleIDCheck(const std::string& name,PhysOptPtr opts):
+    Physics(name, opts),
     mctrue(HistFac,"MCTrue"),
     rec(HistFac,"Rec")
 {
@@ -99,4 +99,4 @@ void ParticleIDCheck::branch_hists::Fill(const Event::Data& data)
 
 }
 
-AUTO_REGISTER_PHYSICS(ParticleIDCheck, "ParticleIDCheck")
+AUTO_REGISTER_PHYSICS(ParticleIDCheck)

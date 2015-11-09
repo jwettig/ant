@@ -10,11 +10,9 @@ class Setup_2014_EPT : public Setup
 {
 public:
 
-    Setup_2014_EPT(const string& name);
+    Setup_2014_EPT(const string& name, SetupOptPtr opt);
 
     virtual double GetElectronBeamEnergy() const override;
-
-    virtual cluster_thresholds_t GetClusterThresholds() const override;
 
     bool Matches(const THeaderInfo& header) const override;
 

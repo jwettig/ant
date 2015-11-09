@@ -37,6 +37,7 @@ protected:
 
     static ant::interval<double> getRange(const TF1* func);
     static void setRange(TF1* func, const ant::interval<double>& i);
+    static void doFit(TH1* hist, TF1* func, size_t repeat = 2);
 
     static void saveTF1(const TF1* func, SavedState_t& out);
     static void loadTF1(SavedState_t::const_iterator& data_pos, TF1* func);
@@ -46,6 +47,8 @@ public:
     virtual void Draw() =0;
     knoblist_t& GetKnobs() { return knobs; }
     virtual void Fit(TH1* hist) =0;
+    virtual void FitSignal(TH1*) {}
+    virtual void FitBackground(TH1*) {}
 
     /**
      * @brief Set/Calcualte default parameter values. The hist that will be fitted later is given to allow adaptions
@@ -59,12 +62,13 @@ public:
 
     virtual SavedState_t Save() const =0;
     virtual void Load(const std::vector<double>& data) =0;
+
 };
 
 class PeakingFitFunction: public FitFunction
 {
 public:
-    PeakingFitFunction(): FitFunction(){}
+    PeakingFitFunction();
     virtual double GetPeakPosition() const =0;
     virtual double GetPeakWidth() const =0;
 };

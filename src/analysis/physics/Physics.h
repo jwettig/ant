@@ -32,7 +32,7 @@ private:
 protected:
     SmartHistFactory HistFac;
 
-    const std::string GetOption(const std::string& key) const;
+    std::string GetOption(const std::string& key) const;
 
 public:
     Physics(const std::string& name, PhysOptPtr opts=nullptr);
@@ -40,7 +40,7 @@ public:
     virtual void ProcessEvent(const data::Event& event) =0;
     virtual void Finish() {}
     virtual void ShowResult() =0;
-    std::string GetName() { return name_; }
+    std::string GetName() const { return name_; }
 
     virtual void Initialize(data::Slowcontrol& slowcontrol);
 
@@ -48,32 +48,27 @@ public:
     Physics& operator=(const Physics&) = delete;
 };
 
-template<class T>
-std::unique_ptr<Physics> physics_factory(PhysOptPtr opts)
-{
-    return std_ext::make_unique<T>(opts);
-}
 
-using physics_creator = std::function<std::unique_ptr<Physics>(PhysOptPtr)>;
+
+using physics_creator = std::function<std::unique_ptr<Physics>(const std::string&, PhysOptPtr)>;
 
 class PhysicsRegistry
 {
+    friend class PhysicsRegistration;
+
 private:
     using physics_creators_t = std::map<std::string, physics_creator>;
     physics_creators_t physics_creators;
-
-public:
-    static PhysicsRegistry& get();
-
-    static std::unique_ptr<Physics> Create(const std::string& name, PhysOptPtr opts);
-
-    std::vector<std::string> GetList() const;
+    static PhysicsRegistry& get_instance();
 
     void RegisterPhysics(physics_creator c, const std::string& name) {
         physics_creators[name] = c;
     }
+public:
 
-    static void PrintRegistry();
+    static std::unique_ptr<Physics> Create(const std::string& name, PhysOptPtr opts);
+
+    static std::vector<std::string> GetList();
 
 };
 
@@ -83,7 +78,13 @@ public:
     PhysicsRegistration(physics_creator c, const std::string& name);
 };
 
-#define AUTO_REGISTER_PHYSICS(physics, name) \
-    ant::analysis::PhysicsRegistration _physics_registration_ ## physics(ant::analysis::physics_factory<physics>,name);
+template<class T>
+std::unique_ptr<Physics> physics_factory(const std::string& name, PhysOptPtr opts)
+{
+    return std_ext::make_unique<T>(name, opts);
+}
+
+#define AUTO_REGISTER_PHYSICS(physics) \
+    ant::analysis::PhysicsRegistration _physics_registration_ ## physics(ant::analysis::physics_factory<physics>, #physics);
 
 }} // nammespace ant::analysis

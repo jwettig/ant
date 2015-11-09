@@ -18,6 +18,8 @@
 namespace ant {
 namespace expconfig {
 
+using SetupOptPtr = std::shared_ptr<const OptionsList>;
+
 
 /**
  * @brief The Setup class serves as a base class for all known beamtime setup configurations
@@ -32,6 +34,10 @@ class Setup :
         public UnpackerAcquConfig,
         public UnpackerA2GeantConfig
 {
+private:
+    const std::string name_;
+    SetupOptPtr options;
+
 public:
     virtual std::list< std::shared_ptr< Calibration::PhysicsModule> > GetCalibrations() const override;
 
@@ -46,12 +52,19 @@ public:
 
     virtual std::string GetPIDCutsDirectory() const override;
 
+    virtual std::shared_ptr<calibration::DataManager> GetCalibrationDataManager() const override final {
+        return calibrationDataManager;
+    }
+
     virtual std::string GetName() const override final {
         return name_;
     }
 
 protected:
-    Setup(const std::string& name);
+    Setup(const std::string& name, SetupOptPtr opt);
+
+    std::string GetOption(const std::string& key) const;
+    bool IsFlagSet(const std::string& key) const;
 
     void AddDetector(const std::shared_ptr<Detector_t>& detector) {
         detectors.push_back(detector);
@@ -85,15 +98,12 @@ protected:
     void IgnoreDetectorChannel(Detector_t::Type_t type, unsigned channel);
     void IgnoreDetectorChannels(Detector_t::Type_t type, const std::vector<unsigned>& channels);
 
-    static std::shared_ptr<calibration::DataManager> CreateCalibrationDataManager(const std::string& setupname);
-
     std::list< std::shared_ptr<Detector_t> > detectors;
     std::list< std::shared_ptr<ReconstructHook::Base> > reconstruct_hooks;
     std::list< std::shared_ptr<Calibration::BaseModule> > calibrations;
 
     std::shared_ptr<calibration::DataManager> calibrationDataManager;
-private:
-    const std::string name_;
+
 };
 
 }} // namespace ant::expconfig

@@ -17,6 +17,7 @@
 #include "calibration/modules/PID_PhiAngle.h"
 #include "calibration/modules/TAPS_Time.h"
 #include "calibration/modules/TAPS_Energy.h"
+#include "calibration/modules/TAPS_ShortEnergy.h"
 #include "calibration/modules/TAPS_ShowerCorrection.h"
 #include "calibration/modules/TAPSVeto_Energy.h"
 
@@ -34,8 +35,8 @@ using namespace ant::expconfig;
 using namespace ant::expconfig::setup;
 
 
-Setup_2014_EPT::Setup_2014_EPT(const string& name) :
-    Setup(name)
+Setup_2014_EPT::Setup_2014_EPT(const string& name, SetupOptPtr opt) :
+    Setup(name, opt)
 {
 
     // setup the detectors of interest
@@ -77,6 +78,9 @@ Setup_2014_EPT::Setup_2014_EPT(const string& name) :
     // also the ScalerFrequency needs a reference
     AddHook(convert_ScalerFrequency_Beampolmon);
 
+    bool timecuts = !IsFlagSet("DisableTimecuts");
+    interval<double> no_timecut(-std_ext::inf, std_ext::inf);
+
     AddCalibration<calibration::Scaler>(Detector_t::Type_t::EPT,
                                         convert_ScalerFrequency_Beampolmon);
 
@@ -85,33 +89,35 @@ Setup_2014_EPT::Setup_2014_EPT(const string& name) :
                                       calibrationDataManager,
                                       convert_CATCH_Tagger,
                                       -325, // default offset in ns
-                                      std::make_shared<calibration::gui::FitGausPol0>()
+                                      std::make_shared<calibration::gui::FitGausPol0>(),
+                                      timecuts ? interval<double>{-100, 100} : no_timecut
                                       );
     AddCalibration<calibration::Time>(cb,
                                       calibrationDataManager,
                                       convert_CATCH_CB,
                                       -325,      // default offset in ns
                                       std::make_shared<calibration::gui::FitGaus>(),
-                                      interval<double>{-60, 60} // default time window cut in ns
+                                      timecuts ? interval<double>{-10, 100} : no_timecut
                                       );
     AddCalibration<calibration::Time>(pid,
                                       calibrationDataManager,
                                       convert_CATCH_CB,
                                       -325,
                                       std::make_shared<calibration::gui::FitGaus>(),
-                                      interval<double>{-500, 500} // default time window cut in ns
+                                      timecuts ? interval<double>{-7, 7} : no_timecut
                                       );
     AddCalibration<calibration::TAPS_Time>(taps,
-                                      calibrationDataManager,
-                                      convert_MultiHit16bit,
-                                      interval<double>{-500, 500}
-                                      );
+                                           calibrationDataManager,
+                                           convert_MultiHit16bit,
+                                           timecuts ? interval<double>{-10, 10} : no_timecut, // for BaF2
+                                           timecuts ? interval<double>{-20, 20} : no_timecut  // for PbWO4
+                                           );
     AddCalibration<calibration::Time>(tapsVeto,
                                       calibrationDataManager,
                                       convert_MultiHit16bit,
                                       -100,
                                       std::make_shared<calibration::gui::FitGausPol0>(),
-                                      interval<double>{-1000, 1000}, /// \todo make this window smaller...
+                                      timecuts ? interval<double>{-7, 7} : no_timecut,
                                       -0.05 // default gain
                                       );
 
@@ -121,7 +127,9 @@ Setup_2014_EPT::Setup_2014_EPT(const string& name) :
 
     AddCalibration<calibration::TAPS_Energy>(taps, calibrationDataManager, convert_MultiHit16bit );
 
-    AddCalibration<calibration::TAPSVeto_Energy>(calibrationDataManager, convert_MultiHit16bit);
+    AddCalibration<calibration::TAPS_ShortEnergy>(taps, calibrationDataManager, convert_MultiHit16bit );
+
+    AddCalibration<calibration::TAPSVeto_Energy>(tapsVeto, calibrationDataManager, convert_MultiHit16bit);
 
     // enable TAPS shower correction, which is a hook running on list of clusters
     AddCalibration<calibration::TAPS_ShowerCorrection>();
@@ -130,19 +138,13 @@ Setup_2014_EPT::Setup_2014_EPT(const string& name) :
     AddCalibration<calibration::PID_PhiAngle>(pid, calibrationDataManager);
 
     // CB timing needs timewalk correction
-    AddCalibration<calibration::CB_TimeWalk>(cb, calibrationDataManager);
+    AddCalibration<calibration::CB_TimeWalk>(cb, calibrationDataManager,
+                                             timecuts ? interval<double>{-5, 10} : no_timecut);
 
 }
 
 double Setup_2014_EPT::GetElectronBeamEnergy() const {
     return 1604.0;
-}
-
-ant::ExpConfig::Reconstruct::cluster_thresholds_t Setup_2014_EPT::GetClusterThresholds() const {
-    return {
-        {Detector_t::Type_t::CB,   15}, // in MeV
-        {Detector_t::Type_t::TAPS, 20}, // in MeV
-    };
 }
 
 bool Setup_2014_EPT::Matches(const ant::THeaderInfo& header) const {
@@ -165,5 +167,7 @@ ant::ExpConfig::Reconstruct::candidatebuilder_config_t Setup_2014_EPT::GetCandid
 {
     candidatebuilder_config_t conf;
     conf.PID_Phi_Epsilon = std_ext::degree_to_radian(2.0);
+    conf.CB_ClusterThreshold = 15;
+    conf.TAPS_ClusterThreshold = 20;
     return conf;
 }

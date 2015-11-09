@@ -1,11 +1,17 @@
 #pragma once
 
+#include <map>
 #include <list>
 #include <memory>
 #include <functional>
 
 namespace ant {
+
+class OptionsList;
+
 namespace expconfig {
+
+using SetupOptPtr = std::shared_ptr<const OptionsList>;
 
 class Setup;
 
@@ -20,19 +26,23 @@ class SetupRegistry
 friend class SetupRegistration;
 
 private:
-    using Creator = std::function<std::shared_ptr<Setup>()>;
-    using setup_creators_t = std::list<Creator>;
-    using setups_t = std::list< std::shared_ptr<Setup> >;
+    using Creator = std::function<std::shared_ptr<Setup>(const std::string& name, SetupOptPtr)>;
+    using setup_creators_t = std::map<std::string, Creator>;
+    using setups_t = std::map<std::string, std::shared_ptr<Setup> >;
     setup_creators_t setup_creators;
     setups_t setups;
-    void init_setups();
-    void add(Creator);
-    SetupRegistry() {}
+    SetupOptPtr options;
+
+    void RegisterSetup(Creator, std::string);
+    static SetupRegistry& get_instance();
+
+    SetupRegistry();
+    ~SetupRegistry();
 public:
-    static SetupRegistry& get();
-    setups_t::iterator begin();
-    setups_t::iterator end();
-    void destroy();
+    static std::shared_ptr<Setup> GetSetup(const std::string& name);
+    static std::list<std::string> GetNames();
+    static void SetSetupOptions(SetupOptPtr opt);
+    static void Destroy();
 };
 
 /**
@@ -41,10 +51,16 @@ public:
 class SetupRegistration
 {
 public:
-    SetupRegistration(SetupRegistry::Creator);
+    SetupRegistration(SetupRegistry::Creator, std::string);
 };
 
+template<class T>
+std::shared_ptr<Setup> setup_factory(const std::string& name, SetupOptPtr opt)
+{
+    return std::make_shared<T>(name, opt);
+}
+
 #define AUTO_REGISTER_SETUP(setup) \
-    SetupRegistration _setup_registration_ ## setup(std::make_shared<setup>);
+    SetupRegistration _setup_registration_ ## setup(ant::expconfig::setup_factory<setup>, #setup);
 
 }} // namespace ant::expconfig

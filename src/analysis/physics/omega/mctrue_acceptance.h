@@ -23,8 +23,10 @@ protected:
 
     det_hit_count_t AllAccepted(const data::ParticleList& particles);
 
+    bool alldetectable(const data::ParticleList& particles) const;
+
 public:
-    MCTrueAcceptance(PhysOptPtr opts);
+    MCTrueAcceptance(const std::string& name, PhysOptPtr opts);
 
     void ProcessEvent(const data::Event &event) override;
     void Finish() override;

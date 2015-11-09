@@ -3,8 +3,10 @@
 #include "analysis/physics/Physics.h"
 #include "analysis/plot/SmartHist.h"
 #include "analysis/utils/A2GeoAcceptance.h"
-
+#include "base/Tree.h"
 #include "base/interval.h"
+#include "analysis/utils/particle_tools.h"
+#include "base/std_ext/math.h"
 
 #include <map>
 
@@ -13,6 +15,7 @@ class TH2D;
 class TH3D;
 class TTree;
 namespace ant {
+
 namespace analysis {
 namespace physics {
 
@@ -30,7 +33,7 @@ public:
 
     std::map<std::string,PerChannel_t> channels;
 
-    OmegaMCTruePlots(PhysOptPtr opts);
+    OmegaMCTruePlots(const std::string& name, PhysOptPtr opts);
 
     void ProcessEvent(const data::Event& event);
     void Finish();
@@ -111,14 +114,14 @@ protected:
     BinSettings mmbinning = BinSettings(1000, 400,1400);
 
 public:
-    OmegaEtaG(PhysOptPtr opts);
+    OmegaEtaG(const std::string& name, PhysOptPtr opts);
     virtual ~OmegaEtaG() = default;
     void ShowResult() override;
 };
 
 
 
-class OmegeMCTree : public Physics {
+class OmegaMCTree : public Physics {
 protected:
     TTree* tree = nullptr;
     TLorentzVector proton_vector;
@@ -130,8 +133,8 @@ protected:
 
 public:
 
-    OmegeMCTree(PhysOptPtr opts);
-    virtual ~OmegeMCTree();
+    OmegaMCTree(const std::string& name, PhysOptPtr opts);
+    virtual ~OmegaMCTree();
 
     void ProcessEvent(const data::Event& event) override;
     void ShowResult() override;
@@ -147,19 +150,34 @@ class OmegaEtaG2 : public OmegaBase {
 protected:
     void Analyse(const data::Event::Data &data, const data::Event &event) override;
 
-    double pEk = {};
-    double pTheta = {};
-    double pPhi = {};
+    struct mParticleVars : ant::analysis::utils::ParticleVars {
+        double matchAngle = -1.0;
+
+        virtual void SetBranches(TTree* tree, const std::string& name) override;
+
+        using ParticleVars::ParticleVars;
+
+        virtual ~mParticleVars() {}
+    };
+
+    std::shared_ptr<ant::Tree<const ParticleTypeDatabase::Type&>> signal_tree;
+    std::shared_ptr<ant::Tree<const ParticleTypeDatabase::Type&>> reference_tree;
+
+    analysis::utils::ParticleVars pbranch;
     double pTime = {};
 
-    double gggIM = {};
-    double gggTheta = {};
-    double gggPhi = {};
+    analysis::utils::ParticleVars gggbranch;
     double gggTime = {};
-    double gggE = {};
 
     double ggIM[3] = {};
-    double MM = {};
+
+    analysis::utils::ParticleVars calcp;
+
+    double angle_p_calcp = {};
+
+    mParticleVars g1branch;
+    mParticleVars g2branch;
+    mParticleVars g3branch;
 
     int    tagch = -1;
     double tagtime = {};
@@ -182,8 +200,51 @@ protected:
 
     channel_type_t identify(const data::Event& event) const;
 
+
+
+    struct particleCuts_t {
+        interval<double> E_range = {0,1600};
+        interval<double> Theta_range = {0, 2*M_PI};
+
+        bool TestParticle(const data::Particle& p) const;
+    };
+
+    particleCuts_t photon_cut;
+    particleCuts_t proton_cut;
+
+    data::ParticleList FilterParticles(const data::ParticleList& list, const particleCuts_t& cuts) const;
+
+    struct expected_peak_t {
+        double Mean;
+        double Sigma;
+        expected_peak_t(double mean, double sigma) :
+            Mean(mean), Sigma(sigma) {}
+    };
+
+    const expected_peak_t omega_peak = {7.64266e+02, 3.29420e+01};
+    const expected_peak_t eta_peak   = {5.30815e+02, 2.93928e+01};
+    const expected_peak_t pi0_peak   = {1.31331e+02, 1.04835e+01};
+
+    double Chi2_Omega = 0.0;
+    double Chi2_Pi0[3] = {};
+    double Chi2_Eta[3] = {};
+    char   bestEtaIn = 0;
+    char   bestPi0In = 0;
+
+    double   bestChi = 0;
+    char     bestHyp   = 0; // 1== Eta, 2==Pi0, 0==??
+
+    double EgOmegaSys[3] = {};
+
+    TH1D* steps;
+
+    const interval<double> complcut = std_ext::degree_to_radian(interval<double>::CenterWidth(180,30));
+
+    TH1D* h_TotalEvents;
+
+
 public:
-    OmegaEtaG2(PhysOptPtr opts);
+    OmegaEtaG2(const std::string& name, PhysOptPtr opts);
     virtual ~OmegaEtaG2();
 
 };

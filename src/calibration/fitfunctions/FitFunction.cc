@@ -27,6 +27,14 @@ void FitFunction::setRange(TF1* func, const ant::interval<double>& i)
     func->SetRange(i.Start(), i.Stop());
 }
 
+void FitFunction::doFit(TH1* hist, TF1* func, size_t repeat)
+{
+    // sometimes, the fit does not converge after first call
+    // is this a bug in ROOT?
+    for(size_t i=0;i<repeat+1;i++)
+        hist->Fit(func,"RBQN");
+}
+
 void FitFunction::saveTF1(const TF1 *func, SavedState_t &out)
 {
     auto range = getRange(func);
@@ -48,3 +56,5 @@ void FitFunction::loadTF1(SavedState_t::const_iterator &data_pos, TF1 *func)
 FitFunction::~FitFunction()
 {}
 
+
+PeakingFitFunction::PeakingFitFunction(): FitFunction(){}

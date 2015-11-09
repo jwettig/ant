@@ -34,7 +34,8 @@ class CB_TimeWalk :
 public:
     CB_TimeWalk(
             const std::shared_ptr<expconfig::detector::CB>& cb,
-            const std::shared_ptr<DataManager>& calmgr
+            const std::shared_ptr<DataManager>& calmgr,
+            const interval<double>& timeWindow
             );
     virtual ~CB_TimeWalk();
 
@@ -92,6 +93,8 @@ public:
     // Updateable_traits interface
     virtual std::vector<std::list<TID> > GetChangePoints() const override;
     virtual void Update(std::size_t index, const TID& id) override;
+    void UpdatedTIDFlags(const TID& id) override;
+
 
 protected:
     std::vector< std::shared_ptr<gui::FitTimewalk> > timewalks;
@@ -99,9 +102,8 @@ protected:
     std::shared_ptr<expconfig::detector::CB> cb_detector;
     std::shared_ptr<DataManager> calibrationManager;
 
-
-
-
+    const interval<double> TimeWindow;
+    bool IsMC = false;
 
 };
 

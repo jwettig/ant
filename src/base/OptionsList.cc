@@ -1,6 +1,7 @@
 #include "OptionsList.h"
 
 #include "Logger.h"
+#include <cstdlib>
 
 using namespace std;
 using namespace ant;
@@ -51,4 +52,36 @@ string OptionsList::GetOption(const string& key) const
 
     return entry->second;
 
+}
+
+bool OptionsList::IsFlagSet(const string& key) const
+{
+    string val = GetOption(key);
+    std::transform(val.begin(), val.end(), val.begin(), ::tolower);
+    if(val == "on" || val == "1" || val == "true" || val == "yes") {
+        return true;
+    }
+    return false;
+}
+
+template<>
+double ant::OptionsList::Get<double>(const string& key, const double& def_value) const
+{
+
+    const auto& v = GetOption(key);
+    if(v.empty()) {
+        return def_value;
+    }
+    return std::atof(v.c_str());
+
+}
+
+template<>
+int ant::OptionsList::Get<int>(const string& key, const int& def_value) const
+{
+    const auto& v = GetOption(key);
+    if(v.empty()) {
+        return def_value;
+    }
+    return std::atoi(v.c_str());
 }

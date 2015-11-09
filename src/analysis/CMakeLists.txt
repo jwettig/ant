@@ -34,7 +34,7 @@ set(ANALYSIS_PHYSICS
   physics/PhysicsManager.cc
   physics/test/TestPhysics.cc
   physics/DeltaPlus/DeltaPlusPhysics.cc
-  physics/DeltaTreeGenerator/DeltaTreeGenerator.cc
+  physics/DeltaPlus/DeltaTreeGenerator.cc
   physics/omega/omega.cc
   physics/omega/GeoAcceptance.cc
   physics/test/TestAPLCON.cc
@@ -45,10 +45,16 @@ set(ANALYSIS_PHYSICS
   physics/common/ProtonCheck.cc
   physics/common/DebugPhysics.cc
   physics/common/ReconstructCheck.cc
+  physics/common/MCSmearing.cc
   physics/tpc/PhysicsStats.cc
   physics/SlowcontrolManager.cc
   physics/etaprime/etaprime_omega_gamma.cc
-  physics/wolfes/etaprime-3pi0.cc
+  physics/etaprime/etaprime-3pi0.cc
+  physics/etaprime/mctrue_3pi0.cc
+  physics/wolfes/etaprime-3pi0-test.cc
+  physics/common/IMPlots.cc
+  physics/common/ProtonTagger.cc
+  physics/common/ExtractTimings.cc
   physics/pion/rarepion.cc
   )
 
@@ -57,6 +63,7 @@ set(ANALYSIS_PLOT
   plot/root_draw.cc
   plot/SmartHist.cc
   plot/HistogramFactories.cc
+  plot/TH1Dcut.cc
 )
 
 set(ANALYSIS_UTILS

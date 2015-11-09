@@ -14,6 +14,7 @@
 using namespace std;
 using namespace ant;
 using namespace ant::calibration;
+using namespace ant::analysis;
 using namespace ant::analysis::data;
 
 TAPS_Energy::TAPS_Energy(std::shared_ptr<expconfig::detector::TAPS> taps,
@@ -35,23 +36,46 @@ TAPS_Energy::TAPS_Energy(std::shared_ptr<expconfig::detector::TAPS> taps,
 
 }
 
-TAPS_Energy::ThePhysics::ThePhysics(const string& name, std::shared_ptr<expconfig::detector::TAPS> taps) :
+TAPS_Energy::ThePhysics::ThePhysics(const string& name, shared_ptr<expconfig::detector::TAPS> taps) :
     Physics(name),
     taps_detector(taps)
 {
-    const analysis::BinSettings taps_channels(taps->GetNChannels());
-    const analysis::BinSettings energybins(1000);
-    const analysis::BinSettings timebins(1000,-100,100);
+    const BinSettings taps_channels(taps->GetNChannels());
+    const BinSettings energybins(1000);
+    const BinSettings timebins(1000,-100,100);
 
     ggIM = HistFac.makeTH2D("2 neutral IM (TAPS,CB)", "IM [MeV]", "#",
                             energybins, taps_channels, "ggIM");
     timing_cuts = HistFac.makeTH2D("Check timing cuts", "IM [MeV]", "#",
                             timebins, taps_channels, "timing_cuts");
+
+    h_pedestals = HistFac.makeTH2D(
+                      "TAPS Pedestals",
+                      "Raw ADC value",
+                      "#",
+                      BinSettings(300),
+                      taps_channels,
+                      "Pedestals");
 }
 
 void TAPS_Energy::ThePhysics::ProcessEvent(const Event& event)
 {
     const auto& cands = event.Reconstructed().Candidates();
+
+    // pedestals
+    for(const Cluster& cluster : event.Reconstructed().AllClusters()) {
+        if(!(cluster.Detector & Detector_t::Type_t::TAPS))
+            continue;
+        for(const Cluster::Hit& clusterhit : cluster.Hits) {
+            /// \todo check for timing hit?
+            /// \todo check for trigger pattern?
+            for(const Cluster::Hit::Datum& datum : clusterhit.Data) {
+                if(datum.Type != Channel_t::Type_t::Pedestal)
+                    continue;
+                h_pedestals->Fill(datum.Value, clusterhit.Channel);
+            }
+        }
+    }
 
     const auto CBTAPS = Detector_t::Type_t::CB | Detector_t::Type_t::TAPS;
 
@@ -97,10 +121,23 @@ void TAPS_Energy::ThePhysics::Finish()
 
 void TAPS_Energy::ThePhysics::ShowResult()
 {
-    canvas(GetName()) << drawoption("colz") << ggIM << timing_cuts << endc;
+    canvas(GetName()) << drawoption("colz") << ggIM
+                      << drawoption("colz") << timing_cuts
+                      << drawoption("colz") << h_pedestals
+                      << endc;
 }
 
 unique_ptr<analysis::Physics> TAPS_Energy::GetPhysicsModule()
 {
     return std_ext::make_unique<ThePhysics>(GetName(), taps_detector);
+}
+
+void TAPS_Energy::GetGUIs(std::list<std::unique_ptr<gui::Manager_traits> >& guis)
+{
+    guis.emplace_back(std_ext::make_unique<GUI_Pedestals>(
+                          GetName(),
+                          Pedestals,
+                          calibrationManager,
+                          taps_detector
+                          ));
 }

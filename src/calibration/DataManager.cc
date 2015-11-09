@@ -32,7 +32,8 @@ void DataManager::Init()
 }
 
 DataManager::DataManager(const string& calibrationDataFolder_):
-    calibrationDataFolder(calibrationDataFolder_)
+    calibrationDataFolder(calibrationDataFolder_),
+    extendable(false)
 {}
 
 DataManager::~DataManager()
@@ -44,7 +45,15 @@ DataManager::~DataManager()
 void DataManager::Add(const TCalibrationData& cdata)
 {
     Init();
-    dataBase->AddItem(cdata);
+    // explicitly copy the given object
+    // to modify its extendable flag
+    auto cdata_ = cdata;
+    if(extendable) {
+        VLOG(3) << "Flagged given TCalibrationData as extendable";
+        cdata_.Extendable = true;
+    }
+    dataBase->AddItem(cdata_);
+    LOG(INFO) << "Added " << cdata_;
 }
 
 
@@ -72,7 +81,9 @@ bool DataManager::GetData(const string& calibrationID,
             cdata = *rit;
             return true;
         }
-        if(rit->Extendable
+        const bool extendable = rit->Extendable
+                                || (rit->FirstID.isSet(TID::Flags_t::MC) && rit->FirstID.isSet(TID::Flags_t::MC));
+        if(extendable
            && rit->FirstID.Flags == eventID.Flags
            && rit->LastID.Flags == eventID.Flags)
         {

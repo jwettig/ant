@@ -45,7 +45,7 @@ CB_Energy::CB_Energy(std::shared_ptr<expconfig::detector::CB> cb,
 unique_ptr<analysis::Physics> CB_Energy::GetPhysicsModule()
 {
     return std_ext::make_unique<ThePhysics>(GetName(),
-                                            Gains.Name,
+                                            RelativeGains.Name,
                                             cb_detector->GetNChannels());
 }
 
@@ -53,7 +53,7 @@ void CB_Energy::GetGUIs(list<unique_ptr<gui::Manager_traits> >& guis)
 {
     guis.emplace_back(std_ext::make_unique<GUI_Gains>(
                           GetName(),
-                          Gains,
+                          RelativeGains,
                           calibrationManager,
                           cb_detector
                           ));
@@ -140,6 +140,7 @@ gui::Manager_traits::DoFitReturn_t CB_Energy::GUI_Gains::DoFit(TH1* hist, unsign
     h_projection = hist2->ProjectionX("",channel+1,channel+1);
 
     func->SetDefaults(h_projection);
+    func->SetRange(interval<double>(50.0,200));
     const auto it_fit_param = fitParameters.find(channel);
     if(it_fit_param != fitParameters.end()
        && !options.IgnorePreviousFitParameters) {
@@ -185,12 +186,13 @@ void CB_Energy::GUI_Gains::StoreFit(unsigned channel)
     // don't forget the fit parameters
     fitParameters[channel] = func->Save();
 
-    h_peaks->Fill(channel, pi0peak);
-    h_relative->Fill(channel, relative_change);
+    h_peaks->SetBinContent(channel+1, pi0peak);
+    h_relative->SetBinContent(channel+1, relative_change);
 }
 
 bool CB_Energy::GUI_Gains::FinishRange()
 {
+    canvas->Clear();
     canvas->Divide(2,2);
 
     canvas->cd(1);

@@ -38,7 +38,7 @@ Time::Time(const std::shared_ptr<Detector_t>& detector, const std::shared_ptr<Da
     Detector(detector),
     calibrationManager(CalibrationManager),
     Converter(move(converter)),
-    TimeWindow(timeWindow),
+    TimeWindows(detector->GetNChannels(), timeWindow),
     fitFunction(FitFunction),
     DefaultOffsets(detector->GetNChannels(), defaultOffset),
     Offsets(),
@@ -67,10 +67,15 @@ void Time::Update(size_t, const TID& id)
         }
     }
     else {
-        LOG(WARNING) << "No calibration data found for offsets"
+        LOG_IF(!Offsets.empty(), WARNING) << "No calibration data found for offsets"
                      << " at changepoint TID=" << id << ", using default values";
-        Offsets = DefaultOffsets;
+        Offsets.resize(0);
     }
+}
+
+void Time::UpdatedTIDFlags(const TID& id)
+{
+    IsMC = id.isSet(TID::Flags_t::MC);
 }
 
 std::unique_ptr<Physics> Time::GetPhysicsModule() {
@@ -90,6 +95,9 @@ void Time::GetGUIs(std::list<std::unique_ptr<gui::Manager_traits> >& guis) {
 
 void Time::ApplyTo(const readhits_t& hits, extrahits_t&)
 {
+    if(IsMC)
+        return;
+
     const auto& dethits = hits.get_item(Detector->Type);
 
     // now calibrate the Times (ignore any other kind of hits)
@@ -113,7 +121,7 @@ void Time::ApplyTo(const readhits_t& hits, extrahits_t&)
             else
                 value -= Offsets[dethit->Channel];
 
-            if(!TimeWindow.Contains(value))
+            if(!TimeWindows[dethit->Channel].Contains(value))
             {
                 VLOG(9) << "Discarding hit in channel " << dethit->Channel << ", which is outside time window.";
                 continue;
@@ -261,7 +269,7 @@ void Time::TheGUI::StoreFit(unsigned channel)
     const double oldOffset = previousOffsets[channel];
     const double timePeak = fitFunction->GetPeakPosition();
 
-    timePeaks->Fill(channel,timePeak);
+    timePeaks->SetBinContent(channel+1,timePeak);
 
     // the timePeak should be zero, so this gives directly
     // the value to change the offset
@@ -322,6 +330,4 @@ void Time::TheGUI::StoreFinishRange(const interval<TID>& range)
     }
 
     calmgr->Add(cdata);
-
-    LOG(INFO) << "Added " << cdata;
 }

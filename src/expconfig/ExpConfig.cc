@@ -15,8 +15,8 @@ using namespace std;
 
 namespace ant { // template implementations need explicit namespace
 
-std::string ExpConfig::ManualSetupName = ""; // default empty
-std::shared_ptr<ExpConfig::Setup> ExpConfig::lastSetupFound = nullptr; // default nothing found so far
+std::string ExpConfig::Setup::ManualName = ""; // default empty
+std::shared_ptr<ExpConfig::Setup> ExpConfig::Setup::lastFound = nullptr; // default nothing found so far
 
 template<typename T>
 shared_ptr<T> ExpConfig::Get_(const THeaderInfo& header) {
@@ -27,31 +27,31 @@ shared_ptr<T> ExpConfig::Get_(const THeaderInfo& header) {
     // check first if some manual override of the automatic
     // search is requested
     // remember if the header already contains such an information
-    if(ManualSetupName.empty() && !header.SetupName.empty()) {
-        ManualSetupName = header.SetupName;
-        LOG(INFO) << "Manually set setup name " << ManualSetupName
+    if(Setup::ManualName.empty() && !header.SetupName.empty()) {
+        Setup::ManualName = header.SetupName;
+        LOG(INFO) << "Manually set setup name " << Setup::ManualName
                   << " obtained from header " << header;
     }
 
     shared_ptr<Setup> config = nullptr;
 
-    if(!ManualSetupName.empty()) {
-        config = ExpConfig::Setup::Get(ManualSetupName);
+    if(!Setup::ManualName.empty()) {
+        config = ExpConfig::Setup::Get(Setup::ManualName);
         if(config == nullptr) {
             throw Exception(
                         std_ext::formatter()
                         << "Found no config matching name "
-                        << ManualSetupName
+                        << Setup::ManualName
                         );
         }
     }
     else {
         // go to automatic search mode in all registered setups
 
-        // make a copy of the list of registered configs
-        // they only need to implement the Matches(THeaderInfo&) methodd
-        auto& registry = expconfig::SetupRegistry::get();
-        std::list< std::shared_ptr<Setup> > modules(registry.begin(), registry.end());
+        std::list< std::shared_ptr<Setup> > modules;
+        for(auto setup_name : expconfig::SetupRegistry::GetNames()) {
+            modules.emplace_back(expconfig::SetupRegistry::GetSetup(setup_name));
+        }
 
         // remove the config if the config says it does not match
         modules.remove_if([&header] (const shared_ptr<Setup>& m) {
@@ -69,7 +69,7 @@ shared_ptr<T> ExpConfig::Get_(const THeaderInfo& header) {
                                        << "More than one setup found for header "
                                        << header);
         }
-        lastSetupFound = modules.back();
+        Setup::lastFound = modules.back();
         config = modules.back();
     }
 
@@ -93,32 +93,21 @@ shared_ptr<ExpConfig::Setup> ExpConfig::Setup::Get(const THeaderInfo& header)
      return Get_<ExpConfig::Setup>(header);
 }
 
-list<shared_ptr<ExpConfig::Setup>> ExpConfig::Setup::getAll()
-{
-    auto& registry = expconfig::SetupRegistry::get();
-    std::list< std::shared_ptr<ExpConfig::Setup> > modules(registry.begin(), registry.end());
-    return modules;
-}
+
 
 shared_ptr<ExpConfig::Setup> ExpConfig::Setup::Get(const std::string& name)
 {
-    for(const auto& module : getAll()) {
-        if(module->GetName() == name) {
-            lastSetupFound = module;
-            return module;
-        }
-    }
-    // nothing found matching the name
-    return nullptr;
+    lastFound = expconfig::SetupRegistry::GetSetup(name);
+    return lastFound;
 }
 
 shared_ptr<ExpConfig::Setup> ExpConfig::Setup::GetLastFound()
 {
     // try if we have a name
-    if(lastSetupFound==nullptr && !ManualSetupName.empty()) {
-        Get(ManualSetupName);
+    if(lastFound==nullptr && !ManualName.empty()) {
+        Get(ManualName);
     }
-    return lastSetupFound;
+    return lastFound;
 }
 
 std::shared_ptr<Detector_t> ExpConfig::Setup::GetDetector(Detector_t::Type_t type)
@@ -135,16 +124,13 @@ std::shared_ptr<Detector_t> ExpConfig::Setup::GetDetector(Detector_t::Type_t typ
 
 void ExpConfig::Setup::Cleanup()
 {
-    lastSetupFound = nullptr;
-    expconfig::SetupRegistry::get().destroy();
+    lastFound = nullptr;
+    ManualName = "";
+    expconfig::SetupRegistry::Destroy();
 }
 
-list<string> ExpConfig::Setup::GetNames() {
-    list<string> names;
-    for(auto setup : getAll()) {
-        names.push_back(setup->GetName());
-    }
-    return names;
+std::list<string> ExpConfig::Setup::GetNames() {
+    return expconfig::SetupRegistry::GetNames();
 }
 
 shared_ptr<ExpConfig::Reconstruct> ExpConfig::Reconstruct::Get(const THeaderInfo& header)
