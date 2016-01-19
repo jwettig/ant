@@ -9,7 +9,7 @@ using namespace ant::analysis::physics;
 using namespace ant::analysis::data;
 using namespace std;
 
-RarePionTest::RarePionTest(PhysOptPtr opts) : Physics("RarePionTest", opts)
+RarePionTest::RarePionTest(const std::string& name, PhysOptPtr opts) : Physics(name, opts)
 {
     BinSettings bs  = BinSettings(500);
     IM_gg  = HistFac.makeTH1D("gg IM","2 #gamma IM [MeV]","events",bs,"IM_gg");
@@ -104,4 +104,4 @@ void RarePionTest::ShowResult()
             << endc;
 }
 
-AUTO_REGISTER_PHYSICS(RarePionTest,"RarePionTest")
+AUTO_REGISTER_PHYSICS(RarePionTest)

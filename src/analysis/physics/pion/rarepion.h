@@ -21,7 +21,7 @@ class RarePionTest: public Physics{
 
 
 public:
-    RarePionTest(PhysOptPtr opts);
+    RarePionTest(const std::string& name, PhysOptPtr opts);
     virtual void ProcessEvent(const data::Event& event);
     virtual void Finish();
     virtual void ShowResult();
